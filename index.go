@@ -37,10 +37,14 @@ func NewIndex(rdr io.ReaderAt) *Index {
 	}
 }
 
-func (i *Index) index(name string) (*indexReader, error) {
+func (i *Index) indexWithLock(name string) (*indexReader, error) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
+	return i.index(name)
+}
 
+// This function must be called with the lock held.
+func (i *Index) index(name string) (*indexReader, error) {
 	if rdr, ok := i.idx[name]; ok {
 		return rdr, nil
 	}
@@ -89,6 +93,30 @@ type ReaderAtSized interface {
 
 // UpdaterFn is a function that is passed the name of the file and a ReaderAtSized
 type UpdaterFn func(string, ReaderAtSized) (ReaderAtSized, bool, error)
+
+// Replace replaces the file with the passed in name with the passed in ReaderAtSized.
+// If the passed in ReaderAtSized is nil, the file will be deleted.
+// If the file does not exist, it will be added.
+//
+// This function does not update the actual tar file, it only updates the index.
+func (i *Index) Replace(name string, rdr ReaderAtSized) error {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	// index may overwrite it this replacement.
+	i.index(name)
+
+	if rdr == nil {
+		delete(i.idx, name)
+		return nil
+	}
+
+	i.idx[name] = &indexReader{rdr: rdr, offset: 0, size: rdr.Size(), hdr: &tar.Header{
+		Name: name,
+		Size: rdr.Size(),
+	}}
+	return nil
+}
 
 // Update creates a new tar with the files updated by the passed in updater function.
 // The output tar is written to the passed in io.Writer
