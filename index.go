@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"os"
 )
 
 var (
@@ -20,11 +21,12 @@ type Index struct {
 }
 
 func NewIndex(rdr io.ReaderAt) *Index {
+	ras, ok := rdr.(ReaderAtSized)
 	var size int64
-	if ras, ok := rdr.(ReaderAtSized); ok {
-		size = ras.Size()
+	if !ok {
+		size = 1<<63 - 1
 	} else {
-		ras = io.NewSectionReader(rdr, 0, 1<<63-1)
+		size = ras.Size()
 	}
 	return &Index{
 		rdr: io.NewSectionReader(rdr, 0, size),
@@ -44,11 +46,13 @@ func (i *Index) index(name string) (*indexReader, error) {
 	for {
 		hdr, err := i.tar.Next()
 		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
 			if err == io.EOF {
 				return nil, fs.ErrNotExist
 			}
 			return nil, fmt.Errorf("error Indexing tar: %w", err)
 		}
+		fmt.Fprintln(os.Stderr, hdr.Name)
 
 		pos, err := i.rdr.Seek(0, io.SeekCurrent)
 		if err != nil {
