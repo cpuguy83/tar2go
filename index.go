@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"os"
 )
 
 var (
@@ -46,13 +45,11 @@ func (i *Index) index(name string) (*indexReader, error) {
 	for {
 		hdr, err := i.tar.Next()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
 			if err == io.EOF {
 				return nil, fs.ErrNotExist
 			}
 			return nil, fmt.Errorf("error Indexing tar: %w", err)
 		}
-		fmt.Fprintln(os.Stderr, hdr.Name)
 
 		pos, err := i.rdr.Seek(0, io.SeekCurrent)
 		if err != nil {
