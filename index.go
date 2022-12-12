@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"sync"
 )
 
 var (
@@ -13,12 +14,15 @@ var (
 	ErrDelete = errors.New("delete")
 )
 
+// Index is a tar index that can be used to read files from a tar.
 type Index struct {
 	rdr *io.SectionReader
 	tar *tar.Reader
+	mu  sync.Mutex
 	idx map[string]*indexReader
 }
 
+// NewIndex creates a new Index from the passed in io.ReaderAt.
 func NewIndex(rdr io.ReaderAt) *Index {
 	ras, ok := rdr.(ReaderAtSized)
 	var size int64
@@ -34,6 +38,9 @@ func NewIndex(rdr io.ReaderAt) *Index {
 }
 
 func (i *Index) index(name string) (*indexReader, error) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
 	if rdr, ok := i.idx[name]; ok {
 		return rdr, nil
 	}
@@ -64,19 +71,23 @@ func (i *Index) index(name string) (*indexReader, error) {
 	}
 }
 
+// Reader returns an io.ReaderAt that can be used to read the entire tar.
 func (i *Index) Reader() *io.SectionReader {
 	return io.NewSectionReader(i.rdr, 0, i.rdr.Size())
 }
 
+// FS returns an fs.FS that can be used to read the files in the tar.
 func (i *Index) FS() fs.FS {
 	return &filesystem{idx: i}
 }
 
+// ReaderAtSized is an io.ReaderAt that also implements a Size method.
 type ReaderAtSized interface {
 	io.ReaderAt
 	Size() int64
 }
 
+// UpdaterFn is a function that is passed the name of the file and a ReaderAtSized
 type UpdaterFn func(string, ReaderAtSized) (ReaderAtSized, bool, error)
 
 // Update creates a new tar with the files updated by the passed in updater function.
