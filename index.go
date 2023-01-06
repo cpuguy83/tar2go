@@ -59,7 +59,7 @@ func (i *Index) index(name string) (*indexReader, error) {
 			if err == io.EOF {
 				return nil, fs.ErrNotExist
 			}
-			return nil, fmt.Errorf("error Indexing tar: %w", err)
+			return nil, fmt.Errorf("error indexing tar: %w", err)
 		}
 
 		pos, err := i.rdr.Seek(0, io.SeekCurrent)
