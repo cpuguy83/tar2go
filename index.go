@@ -44,7 +44,7 @@ func (i *Index) indexWithLock(name string) (*indexReader, error) {
 }
 
 func filterFSPrefix(name string) string {
-	if len(name) == 0 {
+	if len(name) <= 1 {
 		return name
 	}
 	if name[0] == '/' {
