@@ -43,8 +43,22 @@ func (i *Index) indexWithLock(name string) (*indexReader, error) {
 	return i.index(name)
 }
 
+func filterFSPrefix(name string) string {
+	if len(name) == 0 {
+		return name
+	}
+	if name[0] == '/' {
+		return name[1:]
+	}
+	if len(name) > 2 && name[0] == '.' && name[1] == '/' {
+		return name[2:]
+	}
+	return name
+}
+
 // This function must be called with the lock held.
 func (i *Index) index(name string) (*indexReader, error) {
+	name = filterFSPrefix(name)
 	if rdr, ok := i.idx[name]; ok {
 		return rdr, nil
 	}
@@ -67,9 +81,10 @@ func (i *Index) index(name string) (*indexReader, error) {
 			return nil, fmt.Errorf("error getting file offset: %w", err)
 		}
 		rdr := &indexReader{rdr: i.rdr, offset: pos, size: hdr.Size, hdr: hdr}
-		i.idx[hdr.Name] = rdr
+		hdrName := filterFSPrefix(hdr.Name)
+		i.idx[hdrName] = rdr
 
-		if hdr.Name == name {
+		if hdrName == name {
 			return rdr, nil
 		}
 	}
